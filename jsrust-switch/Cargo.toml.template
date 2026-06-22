@@ -1,0 +1,18 @@
+[package]
+name = "jsrust-switch"
+version = "0.0.0"
+edition = "2021"
+[lib]
+name = "jsrust"
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+[dependencies]
+jsrust_shared = { path = "/root/sm/mozjs-128.13.0/js/src/rust/shared" }
+mozglue-static = { path = "/root/sm/mozjs-128.13.0/mozglue/static/rust" }
+[patch.crates-io]
+mozbuild = { path = "/root/sm/mozjs-128.13.0/build/rust/mozbuild" }
+mozilla-central-workspace-hack = { path = "/root/sm/mozjs-128.13.0/build/workspace-hack" }
+encoding_c = { path = "/root/jsrust-patches/encoding_c" }
+encoding_c_mem = { path = "/root/jsrust-patches/encoding_c_mem" }
+[profile.release]
+panic = "abort"

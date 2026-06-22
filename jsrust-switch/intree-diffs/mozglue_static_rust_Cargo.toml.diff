@@ -1,0 +1,11 @@
+--- /tmp/mozjs-128.13.0/mozglue/static/rust/Cargo.toml	2025-07-24 15:27:17.000000000 -0400
++++ /root/sm/mozjs-128.13.0/mozglue/static/rust/Cargo.toml	2026-06-16 16:01:15.379262242 -0400
+@@ -8,7 +8,7 @@
+ path = "lib.rs"
+ 
+ [dependencies]
+-arrayvec = "0.7"
++arrayvec = { version = "0.7", default-features = false }
+ 
+ [build-dependencies]
+ mozbuild = "0.1"

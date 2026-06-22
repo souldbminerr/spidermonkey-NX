@@ -1,0 +1,15 @@
+--- /tmp/mozjs-128.13.0/intl/bidi/rust/unicode-bidi-ffi/src/lib.rs	2025-07-24 15:26:17.000000000 -0400
++++ /root/sm/mozjs-128.13.0/intl/bidi/rust/unicode-bidi-ffi/src/lib.rs	2026-06-16 16:10:51.139938978 -0400
+@@ -1,7 +1,12 @@
++#![no_std]
+ /* This Source Code Form is subject to the terms of the Mozilla Public
+  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+  * You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++extern crate alloc;
++use alloc::boxed::Box;
++use alloc::vec::Vec;
++use alloc::string::String;
+ use icu_properties::bidi::BidiClassAdapter;
+ use icu_properties::maps;
+ 

@@ -1,0 +1,38 @@
+# mozconfig.switch — SpiderMonkey 128 cross-config for Nintendo Switch (libnx/newlib)
+# Consumed by build-switch.sh. DRAFT: gets `./mach configure` running so we can
+# surface the C++ newlib/libnx blockers; expect iteration.
+#
+# Strategy notes:
+#  - Interpreter-only FIRST (--disable-jit): avoids W^X executable-memory rules
+#    and aarch64 JIT asm/signal handling until the rest works.
+#  - Static lib (--disable-shared-js): the NRO links statically.
+#  - newlib malloc via mozglue's GeckoAlloc (so --disable-jemalloc).
+#  - --without-intl-api: no ICU inside SM (0 A.D. links ICU separately).
+#  - Rust (jsrust) is built separately for aarch64-nintendo-switch-freestanding
+#    with -Z build-std=core,alloc and our no_std patches (see patches/switch/).
+
+ac_add_options --enable-project=js
+ac_add_options --disable-shared-js
+ac_add_options --disable-jemalloc
+ac_add_options --without-intl-api
+ac_add_options --disable-js-shell
+ac_add_options --disable-tests
+ac_add_options --disable-jit
+ac_add_options --enable-optimize
+ac_add_options --disable-debug
+
+# Disable stack-protector hardening: its glibc-style __stack_chk_guard access (via
+# GOT/TLS) is not applied correctly by the homebrew NRO loader -> null deref in
+# every canary-protected function (e.g. js::NewContext). newlib/libnx target.
+ac_add_options --disable-hardening
+
+# Cross target. We present aarch64 as linux-gnu to satisfy SpiderMonkey's POSIX
+# assumptions, then patch the gaps against libnx/newlib. (horizon is not a triple
+# SM's configure understands.)
+ac_add_options --target=aarch64-unknown-linux-gnu
+
+# Toolchain is provided via env in build-switch.sh (CC/CXX = clang cross targeting
+# the devkitPro aarch64 newlib sysroot + libnx includes).
+
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-switch
+mk_add_options MOZ_NOSPAM=1
