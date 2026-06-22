@@ -40,7 +40,7 @@ long sysconf(int name) {
   case 8:
     return 0x1000;
   case 0x4f:
-    return 3;
+    return 1;
   default:
     return -1;
   }

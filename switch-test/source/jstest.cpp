@@ -46,6 +46,7 @@ static void *jsThread(void *) {
         eval(cx, global, "let s = 0; for (let i = 1; i <= 100; i++) s += i; s");
         eval(cx, global, "Math.sqrt(144)");
         eval(cx, global, "[1, 2, 3, 4, 5].reduce((a, b) => a * b, 1)");
+        eval(cx, global, "function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); } fact(10)");
       }
       JS_DestroyContext(cx);
     }
@@ -79,5 +80,5 @@ int main(int, char **) {
     consoleUpdate(nullptr);
   }
   consoleExit(nullptr);
-  svcExitProcess(); // TODO: remove this dependency
+  return 0;
 }
