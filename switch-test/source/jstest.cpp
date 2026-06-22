@@ -8,9 +8,35 @@
 #include <js/CompilationAndEvaluation.h>
 #include <js/SourceText.h>
 #include <js/Conversions.h>
+#include <js/PropertyAndElement.h>
 
 static JSClass gGlobalClass = {"global", JSCLASS_GLOBAL_FLAGS,
                                &JS::DefaultGlobalClassOps};
+
+static bool consoleLog(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  for (unsigned i = 0; i < args.length(); i++) {
+    JS::RootedString s(cx, JS::ToString(cx, args[i]));
+    if (!s)
+      return false;
+    JS::UniqueChars str = JS_EncodeStringToUTF8(cx, s);
+    if (!str)
+      return false;
+    printf("%s%s", i ? " " : "", str.get());
+  }
+  printf("\n");
+  consoleUpdate(nullptr);
+  args.rval().setUndefined();
+  return true;
+}
+
+static void installConsole(JSContext *cx, JS::HandleObject global) {
+  JSAutoRealm ar(cx, global);
+  JS::RootedObject console(cx, JS_NewPlainObject(cx));
+  JS_DefineFunction(cx, console, "log", consoleLog, 1, 0);
+  JS::RootedValue consoleVal(cx, JS::ObjectValue(*console));
+  JS_SetProperty(cx, global, "console", consoleVal);
+}
 
 static void eval(JSContext *cx, JS::HandleObject global, const char *code) {
   JSAutoRealm ar(cx, global);
@@ -42,11 +68,13 @@ static void *jsThread(void *) {
           cx, JS_NewGlobalObject(cx, &gGlobalClass, nullptr,
                                  JS::FireOnNewGlobalHook, options));
       if (global) {
+        installConsole(cx, global);
         eval(cx, global, "20 + 22");
         eval(cx, global, "let s = 0; for (let i = 1; i <= 100; i++) s += i; s");
         eval(cx, global, "Math.sqrt(144)");
         eval(cx, global, "[1, 2, 3, 4, 5].reduce((a, b) => a * b, 1)");
         eval(cx, global, "function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); } fact(10)");
+        eval(cx, global, "console.log('console.log from', 'SpiderMonkey', 8 * 8)");
       }
       JS_DestroyContext(cx);
     }
