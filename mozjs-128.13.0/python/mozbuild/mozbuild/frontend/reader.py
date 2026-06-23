@@ -470,7 +470,9 @@ class TemplateFunction(object):
             return c(
                 ast.Subscript(
                     value=c(ast.Name(id=self._global_name, ctx=ast.Load())),
-                    slice=c(ast.Index(value=c(ast.Str(s=node.id)))),
+                    # ast.Index/ast.Str removed in Python 3.9/3.12; slice is the
+                    # value node directly and string literals are ast.Constant.
+                    slice=c(ast.Constant(value=node.id)),
                     ctx=node.ctx,
                 )
             )
@@ -1044,11 +1046,11 @@ class BuildReader(object):
             value = node.value
             if isinstance(value, ast.List):
                 for v in value.elts:
-                    assert isinstance(v, ast.Str)
-                    yield v.s
+                    assert isinstance(v, ast.Constant)
+                    yield v.value
             else:
-                assert isinstance(value, ast.Str)
-                yield value.s
+                assert isinstance(value, ast.Constant)
+                yield value.value
 
         assignments = []
 

@@ -8,7 +8,7 @@ license = "MPL-2.0"
 path = "lib.rs"
 
 [dependencies]
-arrayvec = "0.7"
+arrayvec = { version = "0.7", default-features = false }
 
 [build-dependencies]
 mozbuild = "0.1"

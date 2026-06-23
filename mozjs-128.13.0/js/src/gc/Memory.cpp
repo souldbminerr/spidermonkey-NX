@@ -881,7 +881,8 @@ size_t GetPageFaultCount() {
     return 0;
   }
   return pmc.PageFaultCount;
-#elif defined(__wasi__)
+#elif defined(__wasi__) || defined(MOZ_SWITCH_NO_SIGNAL)
+  // newlib's struct rusage has no ru_majflt; page-fault stats are unavailable.
   return 0;
 #else
   struct rusage usage;

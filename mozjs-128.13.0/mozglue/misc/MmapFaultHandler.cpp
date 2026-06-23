@@ -6,7 +6,8 @@
 
 #include "MmapFaultHandler.h"
 
-#if defined(XP_UNIX) && !defined(XP_DARWIN) && !defined(__wasi__)
+#if defined(XP_UNIX) && !defined(XP_DARWIN) && !defined(__wasi__) && \
+    !defined(MOZ_SWITCH_NO_SIGNAL)
 
 #  include "mozilla/Assertions.h"
 #  include "mozilla/Atomics.h"

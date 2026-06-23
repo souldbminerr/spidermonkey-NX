@@ -1,3 +1,4 @@
+#![no_std]
 /* Copyright 2018 Mozilla Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+extern crate alloc;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use alloc::string::String;
 extern crate encoding_c;
 extern crate encoding_c_mem;
 extern crate mozglue_static;

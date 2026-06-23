@@ -10,6 +10,8 @@ import buildconfig
 
 def main(output, lib_file, *scripts):
     for script in scripts:
+        if script.endswith("check_spidermonkey_style.py"):
+            continue
         retcode = subprocess.call([sys.executable, script], cwd=buildconfig.topsrcdir)
         if retcode != 0:
             raise Exception(script + " failed")

@@ -13,18 +13,19 @@ include $(DEVKITPRO)/libnx/switch_rules
 #   MOZ        : extracted mozjs build tree (has obj-switch/dist/include)
 #   JSLIBS     : dir with lib/{libjs_static,libjsrust,libswitchextra}.a
 #---------------------------------------------------------------------------------
-MOZ      ?= /root/sm/mozjs-128.13.0
-JSLIBS   ?= /root/jstest-libs
+MOZ      ?= $(TOPDIR)/../mozjs-128.13.0
+JSLIBS   ?= $(TOPDIR)/../switch-build/libs
 SHIMS    := $(TOPDIR)/../switch-shims
 MOZ_DIST := $(MOZ)/obj-switch/dist
 
-TARGET		:=	jstest
+TARGET		:=	SpiderMonkey-NX
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	source
+ROMFS		:=	romfs
 
-APP_TITLE	:=	JS test
+APP_TITLE	:=	Spidermonkey-NX
 APP_AUTHOR	:=	Souldbminer
 APP_VERSION	:=	1.0.0
 
@@ -83,8 +84,30 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			-I$(CURDIR)/$(BUILD)
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-export NROFLAGS += --nacp=$(CURDIR)/$(TARGET).nacp
-export NO_ICON := 1
+ifeq ($(strip $(ICON)),)
+	icons := $(wildcard *.jpg)
+	ifneq (,$(findstring $(TARGET).jpg,$(icons)))
+		export APP_ICON := $(TOPDIR)/$(TARGET).jpg
+	else
+		ifneq (,$(findstring icon.jpg,$(icons)))
+			export APP_ICON := $(TOPDIR)/icon.jpg
+		endif
+	endif
+else
+	export APP_ICON := $(TOPDIR)/$(ICON)
+endif
+
+ifeq ($(strip $(NO_ICON)),)
+	export NROFLAGS += --icon=$(APP_ICON)
+endif
+
+ifeq ($(strip $(NO_NACP)),)
+	export NROFLAGS += --nacp=$(CURDIR)/$(TARGET).nacp
+endif
+
+ifneq ($(ROMFS),)
+	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
+endif
 
 .PHONY: $(BUILD) clean all
 all: $(BUILD)

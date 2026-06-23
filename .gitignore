@@ -33,3 +33,12 @@
 
 # NS
 *.elf
+*.nro
+*.nacp
+
+# In-repo build outputs (reproducible build; not committed)
+mozjs-128.13.0/obj-switch/
+mozjs-128.13.0/mozbuild-state/
+switch-build/libs/
+switch-build/jsrust-build/
+switch-build/jsrust-patches/

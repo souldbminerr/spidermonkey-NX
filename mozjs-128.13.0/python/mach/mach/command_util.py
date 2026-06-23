@@ -289,14 +289,19 @@ class DecoratorVisitor(ast.NodeVisitor):
             kwarg_dict = {}
 
             for name, arg in zip(["command", "subcommand"], decorator.args):
-                kwarg_dict[name] = arg.s
+                # ast.Constant.s was removed in Python 3.12; use .value.
+                kwarg_dict[name] = arg.value if isinstance(arg, ast.Constant) else arg.s
 
             for keyword in decorator.keywords:
                 if keyword.arg not in relevant_kwargs:
                     # We only care about these 3 kwargs, so we can safely skip the rest
                     continue
 
-                kwarg_dict[keyword.arg] = getattr(keyword.value, "s", "")
+                value = keyword.value
+                if isinstance(value, ast.Constant):
+                    kwarg_dict[keyword.arg] = value.value
+                else:
+                    kwarg_dict[keyword.arg] = getattr(value, "s", "")
 
             command = kwarg_dict.pop("command")
             self.results.setdefault(command, {})

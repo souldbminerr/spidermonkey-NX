@@ -39,6 +39,12 @@
 #  define MMAP_FAULT_HANDLER_BEGIN_BUFFER(buf, bufLen) {
 #  define MMAP_FAULT_HANDLER_CATCH(retval) }
 
+#elif defined(MOZ_SWITCH_NO_SIGNAL)
+
+#  define MMAP_FAULT_HANDLER_BEGIN_HANDLE(fd) {
+#  define MMAP_FAULT_HANDLER_BEGIN_BUFFER(buf, bufLen) {
+#  define MMAP_FAULT_HANDLER_CATCH(retval) }
+
 #else
 // Linux
 

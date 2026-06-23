@@ -10,7 +10,11 @@ for rel in mozglue/static/rust/lib.rs mozglue/static/rust/Cargo.toml \
            intl/bidi/rust/unicode-bidi-ffi/src/lib.rs intl/bidi/rust/unicode-bidi-ffi/Cargo.toml \
            js/src/vm/SelfHosting.cpp js/src/vm/Compression.cpp \
            js/src/util/NativeStack.cpp mozglue/misc/StackWalk.cpp; do
-  tar xJf "$TAR" "mozjs-128.13.0/$rel" 2>/dev/null && cp "mozjs-128.13.0/$rel" "$MOZ/$rel"
+  if [ -f "$TAR" ]; then
+    tar xJf "$TAR" "mozjs-128.13.0/$rel" 2>/dev/null && cp "mozjs-128.13.0/$rel" "$MOZ/$rel"
+  else
+    git -C "$SPK" checkout -- "mozjs-128.13.0/$rel" 2>/dev/null || true
+  fi
 done
 sed -i '/# SWITCH_BUILD_STD/d; /cargo_build_flags += -Zbuild-std=core,alloc/d' "$MOZ/config/makefiles/rust.mk"
 
