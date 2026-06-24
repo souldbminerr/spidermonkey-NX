@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <pthread.h>
+#include <sys/stat.h>
 
 #include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
@@ -117,6 +118,7 @@ int main(int, char **) {
   padConfigureInput(1, HidNpadStyleSet_NpadStandard);
   PadState pad;
   padInitializeDefault(&pad);
+  hidInitializeTouchScreen();
 
   consoleClear();
   printf("\x1b[2J\x1b[HSpiderMonkey-NX  loading...");

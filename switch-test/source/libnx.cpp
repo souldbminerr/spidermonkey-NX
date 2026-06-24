@@ -227,7 +227,45 @@ static bool nx_present(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
+static bool nx_print(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (gfxIsInited()) {
+    args.rval().setUndefined();
+    return true;
+  }
+  JS::UniqueChars s = args.length() >= 1 ? argStr(cx, args[0]) : nullptr;
+  if (s) {
+    printf("%s\n", s.get());
+    FILE *f = fopen("sdmc:/switch/sandboxels/log.txt", "a");
+    if (f) { fprintf(f, "%s\n", s.get()); fclose(f); }
+  }
+  args.rval().setUndefined();
+  return true;
+}
+
+static bool nx_touch(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  HidTouchScreenState st = {0};
+  int count = 0, x = 0, y = 0;
+  if (hidGetTouchScreenStates(&st, 1) && st.count > 0) {
+    count = st.count;
+    x = st.touches[0].x;
+    y = st.touches[0].y;
+  }
+  JS::RootedObject o(cx, JS_NewPlainObject(cx));
+  JS::RootedValue cv(cx, JS::NumberValue(count));
+  JS::RootedValue xv(cx, JS::NumberValue(x));
+  JS::RootedValue yv(cx, JS::NumberValue(y));
+  JS_SetProperty(cx, o, "count", cv);
+  JS_SetProperty(cx, o, "x", xv);
+  JS_SetProperty(cx, o, "y", yv);
+  args.rval().setObject(*o);
+  return true;
+}
+
 static const JSFunctionSpec nxFunctions[] = {
+    JS_FN("touch", nx_touch, 0, 0),
+    JS_FN("print", nx_print, 1, 0),
     JS_FN("sleep", nx_sleep, 1, 0),
     JS_FN("readFile", nx_readFile, 1, 0),
     JS_FN("writeFile", nx_writeFile, 2, 0),
@@ -263,6 +301,8 @@ void installNx(JSContext *cx, JS::HandleObject global) {
     JS::RootedValue v(cx, JS::NumberValue((double)b.bit));
     JS_SetProperty(cx, nx, b.name, v);
   }
+
+  installGfx(cx, nx);
 
   JS::RootedValue v(cx, JS::ObjectValue(*nx));
   JS_SetProperty(cx, global, "nx", v);

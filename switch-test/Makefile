@@ -10,13 +10,13 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 #---------------------------------------------------------------------------------
 # Prebuilt SpiderMonkey pieces (built in WSL by switch-build/). Override via env.
-#   MOZ        : extracted mozjs build tree (has obj-switch/dist/include)
+#   MOZ_DIST   : dir with include/ of mozjs headers
 #   JSLIBS     : dir with lib/{libjs_static,libjsrust,libswitchextra}.a
 #---------------------------------------------------------------------------------
 MOZ      ?= $(TOPDIR)/../mozjs-128.13.0
 JSLIBS   ?= $(TOPDIR)/../switch-build/libs
 SHIMS    := $(TOPDIR)/../switch-shims
-MOZ_DIST := $(MOZ)/obj-switch/dist
+MOZ_DIST ?= $(TOPDIR)/../switch-build/dist
 
 TARGET		:=	SpiderMonkey-NX
 BUILD		:=	build
