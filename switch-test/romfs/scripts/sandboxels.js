@@ -21355,7 +21355,7 @@ window.onload = function() {
   const G = (typeof globalThis !== "undefined") ? globalThis : this;
   const log = (m) => { try { nx.print("[boot] " + m); } catch (e) {} };
 
-  const PIXEL_SIZE = 4;
+  const PIXEL_SIZE = 16;
   const SCREEN_W = 1280, SCREEN_H = 720;
   const TARGET_FRAME_MS = 33;
 
