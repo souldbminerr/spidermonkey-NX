@@ -1,15 +1,42 @@
+// === GENERATED: dom-shim.js + engine + bootstrap.js ===
+// ============================================================================
+// Sandboxels on Switch -- minimal browser/DOM shim
+// ----------------------------------------------------------------------------
+// The sandboxels engine is one ~20k-line browser script that assumes a full
+// DOM (document, window, canvas, localStorage, events). On the Switch it runs
+// under SpiderMonkey-NX with only the `nx` host binding available. This file
+// fakes just enough of the browser for the engine to load and run.
+//
+// Design:
+//   * The visible game canvas (getElementById("game")) is "primary": its 2D
+//     context draws straight into the native framebuffer via nx.gfx.
+//   * Every other canvas (createElement("canvas") -- the engine's "pixels" and
+//     "gui" layers, plus scratch canvases) is "offscreen": its 2D context
+//     draws into a CPU RGBA buffer. The engine composites layers onto the
+//     primary canvas with drawImage(), which we turn into a native nx.gfx.blit.
+//   * Everything else the engine pokes at (divs, selects, style, classList,
+//     events) is an inert stub that records but never fires -- gameplay is
+//     driven from bootstrap.js through documented engine globals instead.
+//
+// Load order (single eval scope): dom-shim.js -> engine.js -> bootstrap.js
+// ============================================================================
+
 (function initShim() {
   "use strict";
   const G = (typeof globalThis !== "undefined") ? globalThis : this;
   if (G.__sbxShimInstalled) return;
   G.__sbxShimInstalled = true;
 
+  // ---- console ------------------------------------------------------------
   if (typeof G.console === "undefined") {
     const noop = function () {};
     G.console = { log: noop, warn: noop, error: noop, info: noop, debug: noop,
                   trace: noop, group: noop, groupEnd: noop, table: noop };
   }
 
+  // ---- color parsing ------------------------------------------------------
+  // Returns [r,g,b,a] (0-255). Handles #rgb/#rgba/#rrggbb/#rrggbbaa,
+  // rgb()/rgba(), hsl()/hsla(), a few named colors, and "transparent".
   const NAMED = {
     transparent: [0, 0, 0, 0], black: [0, 0, 0, 255], white: [255, 255, 255, 255],
     red: [255, 0, 0, 255], green: [0, 128, 0, 255], blue: [0, 0, 255, 255],
@@ -21346,19 +21373,36 @@ window.onload = function() {
 
 }
 
+
 } catch (__engineErr) {
   var __m = '' + __engineErr + ' @line ' + (__engineErr && __engineErr.lineNumber) + ':' + (__engineErr && __engineErr.columnNumber);
   try { nx.print('[engine load error] ' + __m + (__engineErr && __engineErr.stack ? '\n' + __engineErr.stack : '')); } catch (_) {}
   throw new Error(__m);
 }
 
+// === bootstrap.js ===
+// ============================================================================
+// Sandboxels on Switch -- bootstrap / main loop
+// ----------------------------------------------------------------------------
+// Runs after dom-shim.js and the extracted engine, in the same eval scope, so
+// it can call engine functions (tick, drawPixels, drawCursor, resizeCanvas,
+// selectElement, setView, clearAll) and read engine globals (settings, width,
+// height, pixelSize, mousePos, mouseType, mouseIsDown, canvasLayers, elements,
+// view, viewInfo, mouseSize).
+//
+// It finishes engine init, switches the harness into framebuffer mode, then
+// owns the frame loop: read Switch input -> drive engine globals -> step the
+// simulation timer -> render pixelMap + cursor + HUD (+ element picker) to the
+// framebuffer using nx.gfx (incl. nx.gfx.text bitmap font).
+// ============================================================================
 
 (function bootstrap() {
   const G = (typeof globalThis !== "undefined") ? globalThis : this;
   const log = (m) => { try { nx.print("[boot] " + m); } catch (e) {} };
 
-  const PIXEL_SIZE = 16;
+  const PIXEL_SIZE = 16;   // screen px per cell. 16 -> 80x45 grid.
   const SCREEN_W = 1280, SCREEN_H = 720;
+  const TARGET_FRAME_MS = 16;     // ~60 fps cap
 
   const text = (s, x, y, col, a, scale) => {
     const c = G.__sbxParseColor(col || "#ffffff");
@@ -21379,6 +21423,7 @@ window.onload = function() {
     return "" + (c || "#888888");
   };
 
+  // --- 1. enter framebuffer mode ------------------------------------------
   const fb = nx.gfx.init();
   log("gfx " + fb.width + "x" + fb.height);
 
@@ -21392,11 +21437,13 @@ window.onload = function() {
       try { G.onload(); } catch (e) { log("onload err: " + e + "\n" + (e && e.stack)); }
     }
 
+    // --- 3. size the world to the screen ------------------------------------
     if (typeof resizeCanvas === "function") {
       try { resizeCanvas(SCREEN_H, SCREEN_W, PIXEL_SIZE, true, true); }
       catch (e) { log("resize err: " + e); }
     }
 
+    // Render the engine's offscreen layers straight to the framebuffer.
     if (typeof canvasLayers === "object" && canvasLayers) {
       for (const k of Object.keys(canvasLayers)) {
         const c = canvasLayers[k];
@@ -21413,6 +21460,7 @@ window.onload = function() {
     }
     refreshBg();
 
+    // --- 4. element catalogue (by category) ---------------------------------
     function buildCatalogue() {
       const map = {};
       for (const name in elements) {
@@ -21421,6 +21469,7 @@ window.onload = function() {
         const cat = el.category || "other";
         (map[cat] || (map[cat] = [])).push(name);
       }
+      // Preferred category ordering; unknown categories appended alphabetically.
       const pref = ["solids", "liquids", "gases", "powders", "life", "energy",
         "tools", "food", "special", "land", "weapons", "states", "machines"];
       const order = Object.keys(map).sort((a, b) => {
@@ -21524,6 +21573,8 @@ window.onload = function() {
     const DEADZONE = 0.2;
     const REPEAT_DELAY = 9, REPEAT_RATE = 3;   // frames: hold-to-repeat for picker
     const repeatState = {};
+    // Fires on initial press and then, after REPEAT_DELAY, every REPEAT_RATE
+    // frames while `on` stays true -- so holding a direction steps continuously.
     function repeat(name, on) {
       const st = repeatState[name] || (repeatState[name] = { t: -1 });
       if (!on) { st.t = -1; return false; }
@@ -21553,6 +21604,7 @@ window.onload = function() {
 
       if (held & B.Plus) return false; // exit
 
+      // ---- picker mode --------------------------------------------------
       if (pickerOpen) {
         mouseIsDown = false;
         if (hit & B.L || hit & B.B) { pickerOpen = false; return true; }
@@ -21569,6 +21621,7 @@ window.onload = function() {
         if (repeat("pD", (held & B.Down) || sy < 0)) hoverIdx = Math.min(itemsOnPage - 1, hoverIdx + COLS);
         if (hoverIdx > itemsOnPage - 1) hoverIdx = Math.max(0, itemsOnPage - 1);
 
+        // A selects the hovered cell and closes; touch still works directly
         if (hit & B.A) {
           const idx = page * PER_PAGE + hoverIdx;
           if (idx >= 0 && idx < list.length) { setElement(list[idx]); pickerOpen = false; }
@@ -21582,6 +21635,7 @@ window.onload = function() {
         return true;
       }
 
+      // ---- play mode ----------------------------------------------------
       if (hit & B.L) { pickerOpen = true; hoverIdx = 0; return true; }
       if (hit & B.R) { // quick-cycle within current category
         const list = curList();
@@ -21604,6 +21658,7 @@ window.onload = function() {
         erasing = !!(held & B.B);     // hold B while touching to erase
         placing = !erasing;
       } else {
+        // continuous cursor motion from stick + held dpad (no press-release needed)
         let mx = sx, my = -sy;        // stick up -> screen up
         if (held & B.Left) mx -= 1;
         if (held & B.Right) mx += 1;
@@ -21619,6 +21674,11 @@ window.onload = function() {
         erasing = !!(held & B.B);
       }
 
+      // The engine draws lineCoords(lastPos -> mousePos) every placement. Since
+      // we feed coordinates directly (bypassing its mouse handler), manage
+      // lastPos ourselves: snap it to the current point on a fresh press (single
+      // dab, no streak from the origin), and to the previous point while a
+      // stroke continues (smooth drag).
       mousePos = { x: gx, y: gy };
       const drawing = placing || erasing;
       if (drawing) {
@@ -21633,6 +21693,7 @@ window.onload = function() {
       return true;
     }
 
+    // --- 7. HUD (text + swatch) ---------------------------------------------
     function drawHud() {
       // top bar
       rect(0, 0, SCREEN_W, 30, "#000000", 150);
@@ -21654,6 +21715,7 @@ window.onload = function() {
       rect(cx - half + sz, cy - half, 1, sz, "#ffffff", 200);
     }
 
+    // top-right readout: element + temperature + state of the pixel under cursor
     const rtext = (s, rightX, y, col, scale) => {
       const sc = scale || 2;
       text(s, rightX - ("" + s).length * 8 * sc, y, col, 255, sc);
@@ -21679,6 +21741,11 @@ window.onload = function() {
       }
     }
 
+    // --- 8. batched grid renderer -------------------------------------------
+    // Instead of ~14k per-cell fillRect calls through drawSquare/fillStyle, build
+    // one packed-color array from currentPixels and hand it to the native
+    // drawGrid in a single call. Falls back to the engine's drawPixels if the
+    // running NRO predates nx.gfx.drawGrid.
     const canBatch = typeof nx.gfx.drawGrid === "function";
     let gridBuf = null, gridW = 0, gridH = 0;
     const u32cache = Object.create(null);
@@ -21710,6 +21777,7 @@ window.onload = function() {
       nx.gfx.drawGrid(gridBuf, W, H, pixelSize, 0, 0);
     }
 
+    // --- 9. render one frame -------------------------------------------------
     function render() {
       const bg = G.__sbxBg;
       nx.gfx.clear(bg[0], bg[1], bg[2]);
@@ -21721,6 +21789,7 @@ window.onload = function() {
       nx.gfx.present();
     }
 
+    // --- 10. main loop -------------------------------------------------------
     for (;;) {
       const frameStart = G.__sbxNow();
       if (!handleInput()) break;

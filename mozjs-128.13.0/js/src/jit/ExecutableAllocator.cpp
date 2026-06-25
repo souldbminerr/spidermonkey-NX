@@ -27,12 +27,13 @@
 
 #include "jit/ExecutableAllocator.h"
 
-#ifdef MOZ_SWITCH
-  #include "switch_jitmem.h"
-#endif
-
 #include "js/MemoryMetrics.h"
 #include "util/Poison.h"
+
+#ifndef MOZ_SWITCH
+#  define MOZ_SWITCH 1
+#endif
+#include "switch_jitmem.h"
 
 using namespace js::jit;
 
