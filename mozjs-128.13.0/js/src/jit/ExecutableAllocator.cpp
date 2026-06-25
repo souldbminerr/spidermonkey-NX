@@ -27,6 +27,10 @@
 
 #include "jit/ExecutableAllocator.h"
 
+#ifdef MOZ_SWITCH
+  #include "switch_jitmem.h"
+#endif
+
 #include "js/MemoryMetrics.h"
 #include "util/Poison.h"
 
@@ -303,7 +307,12 @@ void ExecutableAllocator::poisonCode(JSRuntime* rt,
       // Note: we use memset instead of js::Poison because we want to poison
       // JIT code in release builds too. Furthermore, we don't want the
       // invalid-ObjectValue poisoning js::Poison does in debug builds.
+#ifdef MOZ_SWITCH
+      memset(switchJitWritable(ranges[i].start), JS_SWEPT_CODE_PATTERN,
+             ranges[i].size);
+#else
       memset(ranges[i].start, JS_SWEPT_CODE_PATTERN, ranges[i].size);
+#endif
       MOZ_MAKE_MEM_NOACCESS(ranges[i].start, ranges[i].size);
     }
   }

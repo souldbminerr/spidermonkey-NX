@@ -14,6 +14,8 @@
 
 volatile u64 g_buttonsDown = 0;
 volatile u64 g_buttonsHeld = 0;
+volatile s32 g_lstickX = 0;
+volatile s32 g_lstickY = 0;
 
 static JS::UniqueChars argStr(JSContext *cx, JS::HandleValue v) {
   JS::RootedString s(cx, JS::ToString(cx, v));
@@ -243,6 +245,17 @@ static bool nx_print(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
+static bool nx_stick(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  JS::RootedObject o(cx, JS_NewPlainObject(cx));
+  JS::RootedValue xv(cx, JS::NumberValue((double)g_lstickX / 32767.0));
+  JS::RootedValue yv(cx, JS::NumberValue((double)g_lstickY / 32767.0));
+  JS_SetProperty(cx, o, "x", xv);
+  JS_SetProperty(cx, o, "y", yv);
+  args.rval().setObject(*o);
+  return true;
+}
+
 static bool nx_touch(JSContext *cx, unsigned argc, JS::Value *vp) {
   JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
   HidTouchScreenState st = {0};
@@ -265,6 +278,7 @@ static bool nx_touch(JSContext *cx, unsigned argc, JS::Value *vp) {
 
 static const JSFunctionSpec nxFunctions[] = {
     JS_FN("touch", nx_touch, 0, 0),
+    JS_FN("stick", nx_stick, 0, 0),
     JS_FN("print", nx_print, 1, 0),
     JS_FN("sleep", nx_sleep, 1, 0),
     JS_FN("readFile", nx_readFile, 1, 0),

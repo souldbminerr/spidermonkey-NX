@@ -21352,29 +21352,13 @@ window.onload = function() {
   throw new Error(__m);
 }
 
-// === bootstrap.js ===
-// ============================================================================
-// Sandboxels on Switch -- bootstrap / main loop
-// ----------------------------------------------------------------------------
-// Runs after dom-shim.js and the extracted engine, in the same eval scope, so
-// it can call engine functions (tick, drawPixels, drawCursor, resizeCanvas,
-// selectElement, setView, clearAll) and read engine globals (settings, width,
-// height, pixelSize, mousePos, mouseType, mouseIsDown, canvasLayers, elements,
-// view, viewInfo, mouseSize).
-//
-// It finishes engine init, switches the harness into framebuffer mode, then
-// owns the frame loop: read Switch input -> drive engine globals -> step the
-// simulation timer -> render pixelMap + cursor + HUD (+ element picker) to the
-// framebuffer using nx.gfx (incl. nx.gfx.text bitmap font).
-// ============================================================================
 
 (function bootstrap() {
   const G = (typeof globalThis !== "undefined") ? globalThis : this;
   const log = (m) => { try { nx.print("[boot] " + m); } catch (e) {} };
 
-  const PIXEL_SIZE = 16;   // screen px per cell. 8 -> 160x90 grid (perf-friendly).
+  const PIXEL_SIZE = 16;
   const SCREEN_W = 1280, SCREEN_H = 720;
-  const TARGET_FRAME_MS = 16;     // ~30 fps cap
 
   const text = (s, x, y, col, a, scale) => {
     const c = G.__sbxParseColor(col || "#ffffff");
@@ -21448,7 +21432,7 @@ window.onload = function() {
       return { order, map };
     }
     const cat = buildCatalogue();
-    let catIdx = 0, page = 0, pickerOpen = false;
+    let catIdx = 0, page = 0, pickerOpen = false, hoverIdx = 0;
     const curList = () => cat.map[cat.order[catIdx]] || [];
 
     function setElement(name) {
@@ -21507,16 +21491,23 @@ window.onload = function() {
         const col = n % COLS, row = Math.floor(n / COLS);
         const x = GRID_X + col * CELL_W, y = GRID_TOP + row * CELL_H;
         const sel = name === currentElement;
+        const hov = n === hoverIdx;
         rect(x + 1, y + 1, CELL_W - 3, CELL_H - 3, sel ? "#444a60" : "#1c1c26", 255);
         rect(x + 6, y + 6, 36, CELL_H - 14, elColor(name), 255);
         const label = title(name);
         const maxch = Math.floor((CELL_W - 50) / 16);
         text(label.length > maxch ? label.slice(0, maxch - 1) + "." : label,
           x + 48, y + Math.floor(CELL_H / 2) - 8, "#e8e8f0", 255, 2);
+        if (hov) { // hover outline
+          rect(x, y, CELL_W - 2, 2, "#ffd040", 255);
+          rect(x, y + CELL_H - 4, CELL_W - 2, 2, "#ffd040", 255);
+          rect(x, y, 2, CELL_H - 2, "#ffd040", 255);
+          rect(x + CELL_W - 4, y, 2, CELL_H - 2, "#ffd040", 255);
+        }
       }
       const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
       text(title(cat.order[catIdx]) + "  page " + (page + 1) + "/" + pages +
-        "   (tap to pick, dpad L/R page, L close)", 8, SCREEN_H - 22, "#9090a0", 255, 2);
+        "   (dpad/stick move, A select, ZL/ZR page, tap, L close)", 8, SCREEN_H - 22, "#9090a0", 255, 2);
     }
 
     // --- 6. input ------------------------------------------------------------
@@ -21525,9 +21516,29 @@ window.onload = function() {
       Plus: nx.Plus, Minus: nx.Minus, Up: nx.Up, Down: nx.Down, Left: nx.Left, Right: nx.Right,
     };
     let prevButtons = 0, prevTouch = 0;
-    let cursor = { x: Math.round(width / 2), y: Math.round(height / 2) };
+    let cursorFx = width / 2, cursorFy = height / 2;
+    let cursor = { x: Math.round(cursorFx), y: Math.round(cursorFy) };
     let wasDrawing = false, lastDrawPos = { x: 0, y: 0 };
     const viewCount = (typeof viewInfo === "object") ? Object.keys(viewInfo).length : 1;
+    const CURSOR_SPEED = 2.2;   // grid cells/frame at full deflection
+    const DEADZONE = 0.2;
+    const REPEAT_DELAY = 9, REPEAT_RATE = 3;   // frames: hold-to-repeat for picker
+    const repeatState = {};
+    function repeat(name, on) {
+      const st = repeatState[name] || (repeatState[name] = { t: -1 });
+      if (!on) { st.t = -1; return false; }
+      st.t++;
+      if (st.t === 0) return true;
+      return st.t >= REPEAT_DELAY && (st.t - REPEAT_DELAY) % REPEAT_RATE === 0;
+    }
+    function pagesIn(ci) { return Math.max(1, Math.ceil((cat.map[cat.order[ci]] || []).length / PER_PAGE)); }
+    function pageBy(dir) { // page with rollover into adjacent categories
+      const len = cat.order.length;
+      page += dir;
+      if (page < 0) { catIdx = (catIdx - 1 + len) % len; page = pagesIn(catIdx) - 1; }
+      else if (page >= pagesIn(catIdx)) { catIdx = (catIdx + 1) % len; page = 0; }
+      hoverIdx = 0;
+    }
 
     function handleInput() {
       const held = nx.buttonsHeld();
@@ -21536,27 +21547,42 @@ window.onload = function() {
       const t = nx.touch();
       const touchDown = t.count > 0 && prevTouch === 0; // press edge
       prevTouch = t.count;
+      const stick = (typeof nx.stick === "function") ? nx.stick() : { x: 0, y: 0 };
+      const sx = Math.abs(stick.x) > DEADZONE ? stick.x : 0;
+      const sy = Math.abs(stick.y) > DEADZONE ? stick.y : 0;   // +y = up
 
       if (held & B.Plus) return false; // exit
 
       if (pickerOpen) {
         mouseIsDown = false;
         if (hit & B.L || hit & B.B) { pickerOpen = false; return true; }
+
         const list = curList();
-        const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-        if (hit & B.Right) page = (page + 1) % pages;
-        if (hit & B.Left) page = (page + pages - 1) % pages;
-        if (hit & B.Down) { catIdx = (catIdx + 1) % cat.order.length; page = 0; }
-        if (hit & B.Up) { catIdx = (catIdx + cat.order.length - 1) % cat.order.length; page = 0; }
+        if (hit & B.ZR) pageBy(1);
+        if (hit & B.ZL) pageBy(-1);
+
+        // dpad/stick move the hover cell (hold to repeat)
+        const itemsOnPage = Math.min(PER_PAGE, list.length - page * PER_PAGE);
+        if (repeat("pL", (held & B.Left) || sx < 0)) hoverIdx = Math.max(0, hoverIdx - 1);
+        if (repeat("pR", (held & B.Right) || sx > 0)) hoverIdx = Math.min(itemsOnPage - 1, hoverIdx + 1);
+        if (repeat("pU", (held & B.Up) || sy > 0)) hoverIdx = Math.max(0, hoverIdx - COLS);
+        if (repeat("pD", (held & B.Down) || sy < 0)) hoverIdx = Math.min(itemsOnPage - 1, hoverIdx + COLS);
+        if (hoverIdx > itemsOnPage - 1) hoverIdx = Math.max(0, itemsOnPage - 1);
+
+        if (hit & B.A) {
+          const idx = page * PER_PAGE + hoverIdx;
+          if (idx >= 0 && idx < list.length) { setElement(list[idx]); pickerOpen = false; }
+          return true;
+        }
         if (touchDown) {
           const h = pickerHitTest(t.x, t.y);
-          if (h && h.type === "tab") { catIdx = h.i; page = 0; }
+          if (h && h.type === "tab") { catIdx = h.i; page = 0; hoverIdx = 0; }
           else if (h && h.type === "cell") { setElement(h.name); pickerOpen = false; }
         }
         return true;
       }
 
-      if (hit & B.L) { pickerOpen = true; return true; }
+      if (hit & B.L) { pickerOpen = true; hoverIdx = 0; return true; }
       if (hit & B.R) { // quick-cycle within current category
         const list = curList();
         let i = list.indexOf(currentElement);
@@ -21570,18 +21596,24 @@ window.onload = function() {
       if (hit & B.X) paused = !paused;
       if ((hit & B.Y) && typeof clearAll === "function") { try { clearAll(); } catch (e) {} }
 
-      let placing = false, erasing = false, gx = cursor.x, gy = cursor.y;
+      let placing = false, erasing = false, gx, gy;
       if (t.count > 0) {
         gx = Math.max(0, Math.min(width, Math.floor(t.x / pixelSize)));
         gy = Math.max(0, Math.min(height, Math.floor(t.y / pixelSize)));
-        cursor.x = gx; cursor.y = gy;
+        cursorFx = gx; cursorFy = gy; cursor.x = gx; cursor.y = gy;
         erasing = !!(held & B.B);     // hold B while touching to erase
         placing = !erasing;
       } else {
-        if (hit & B.Up) cursor.y = Math.max(0, cursor.y - 1);
-        if (hit & B.Down) cursor.y = Math.min(height, cursor.y + 1);
-        if (hit & B.Left) cursor.x = Math.max(0, cursor.x - 1);
-        if (hit & B.Right) cursor.x = Math.min(width, cursor.x + 1);
+        let mx = sx, my = -sy;        // stick up -> screen up
+        if (held & B.Left) mx -= 1;
+        if (held & B.Right) mx += 1;
+        if (held & B.Up) my -= 1;
+        if (held & B.Down) my += 1;
+        if (mx < -1) mx = -1; else if (mx > 1) mx = 1;
+        if (my < -1) my = -1; else if (my > 1) my = 1;
+        cursorFx = Math.max(0, Math.min(width, cursorFx + mx * CURSOR_SPEED));
+        cursorFy = Math.max(0, Math.min(height, cursorFy + my * CURSOR_SPEED));
+        cursor.x = Math.round(cursorFx); cursor.y = Math.round(cursorFy);
         gx = cursor.x; gy = cursor.y;
         placing = !!(held & B.A);
         erasing = !!(held & B.B);
@@ -21609,8 +21641,9 @@ window.onload = function() {
       const viewName = (viewInfo[view] && viewInfo[view].name) || "normal";
       text("brush " + mouseSize + "   view " + (viewName || "normal") +
         (paused ? "   PAUSED" : ""), 360, 8, paused ? "#ff8080" : "#a0a0b0", 255, 2);
-      text("L picker  R next  ZL/ZR size  - view  X pause  Y clear  + exit",
+      text("stick/dpad move  A place  B erase  L picker  R next  ZL/ZR size  - view  X pause  Y clear  + exit",
         6, SCREEN_H - 20, "#7080a0", 200, 2);
+      drawHoverInfo();
       // cursor box
       const cx = cursor.x * pixelSize, cy = cursor.y * pixelSize;
       const half = Math.floor(mouseSize / 2) * pixelSize;
@@ -21619,6 +21652,31 @@ window.onload = function() {
       rect(cx - half, cy - half + sz, sz, 1, "#ffffff", 200);
       rect(cx - half, cy - half, 1, sz, "#ffffff", 200);
       rect(cx - half + sz, cy - half, 1, sz, "#ffffff", 200);
+    }
+
+    const rtext = (s, rightX, y, col, scale) => {
+      const sc = scale || 2;
+      text(s, rightX - ("" + s).length * 8 * sc, y, col, 255, sc);
+    };
+    function drawHoverInfo() {
+      let px = null;
+      try { if (typeof getPixel === "function") px = getPixel(cursor.x, cursor.y); } catch (e) {}
+      const rx = SCREEN_W - 8;
+      const PW = 260;
+      rect(SCREEN_W - PW, 0, PW, 84, "#000000", 160);
+      if (px && px.element) {
+        const el = elements[px.element] || {};
+        const swc = G.__sbxParseColor(elColor(px.element));
+        rect(SCREEN_W - PW + 6, 6, 18, 18, "rgb(" + swc[0] + "," + swc[1] + "," + swc[2] + ")", 255);
+        rtext(title(px.element), rx, 8, "#ffffff", 2);
+        const temp = (typeof px.temp === "number") ? Math.round(px.temp) : "?";
+        rtext(temp + " C", rx, 32, "#ffd040", 2);
+        const st = el.state || (el.density !== undefined ? "solid" : "?");
+        rtext("" + st + (el.category ? " / " + el.category : ""), rx, 56, "#a0c0a0", 2);
+      } else {
+        rtext("empty", rx, 8, "#888888", 2);
+        rtext("x" + cursor.x + " y" + cursor.y, rx, 32, "#606070", 2);
+      }
     }
 
     const canBatch = typeof nx.gfx.drawGrid === "function";

@@ -134,6 +134,9 @@ int main(int, char **) {
     padUpdate(&pad);
     g_buttonsDown = padGetButtonsDown(&pad);
     g_buttonsHeld = padGetButtons(&pad);
+    HidAnalogStickState ls = padGetStickPos(&pad, 0);
+    g_lstickX = ls.x;
+    g_lstickY = ls.y;
     svcSleepThread(8000000ULL);
   }
 

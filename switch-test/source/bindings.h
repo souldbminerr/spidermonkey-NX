@@ -4,6 +4,8 @@
 
 extern volatile u64 g_buttonsDown;
 extern volatile u64 g_buttonsHeld;
+extern volatile s32 g_lstickX;
+extern volatile s32 g_lstickY;
 
 void installConsole(JSContext *cx, JS::HandleObject global);
 void installNx(JSContext *cx, JS::HandleObject global);
