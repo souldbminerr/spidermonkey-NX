@@ -17,7 +17,7 @@ RUST_TARGET_SWITCH=aarch64-nintendo-switch-freestanding
 
 SHIMS="$SPK/switch-shims"
 
-SWITCH_DEFS="-D__linux__ -D__gnu_linux__ -D_GNU_SOURCE -DMOZ_SWITCH_NO_SIGNAL"
+SWITCH_DEFS="-D__linux__ -D__gnu_linux__ -D_GNU_SOURCE -DMOZ_SWITCH_NO_SIGNAL -DMOZ_SWITCH"
 SWITCH_INCS="-I$SHIMS -I$LIBNX/include -I$PORTLIBS/include"
 SWITCH_FORCE="-include $SHIMS/switch_pthread_compat.h"
 

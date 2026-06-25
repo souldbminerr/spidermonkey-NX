@@ -983,30 +983,6 @@ dependencies = [
 ]
 
 [[patch.unused]]
-name = "neqo-bin"
-version = "0.7.9"
-
-[[patch.unused]]
-name = "neqo-common"
-version = "0.7.9"
-
-[[patch.unused]]
-name = "neqo-crypto"
-version = "0.7.9"
-
-[[patch.unused]]
-name = "neqo-http3"
-version = "0.7.9"
-
-[[patch.unused]]
-name = "neqo-qpack"
-version = "0.7.9"
-
-[[patch.unused]]
-name = "neqo-transport"
-version = "0.7.9"
-
-[[patch.unused]]
 name = "backtrace"
 version = "0.3.999"
 
@@ -1205,3 +1181,27 @@ version = "0.48.999"
 [[patch.unused]]
 name = "zip"
 version = "0.6.4"
+
+[[patch.unused]]
+name = "neqo-bin"
+version = "0.7.9"
+
+[[patch.unused]]
+name = "neqo-common"
+version = "0.7.9"
+
+[[patch.unused]]
+name = "neqo-crypto"
+version = "0.7.9"
+
+[[patch.unused]]
+name = "neqo-http3"
+version = "0.7.9"
+
+[[patch.unused]]
+name = "neqo-qpack"
+version = "0.7.9"
+
+[[patch.unused]]
+name = "neqo-transport"
+version = "0.7.9"

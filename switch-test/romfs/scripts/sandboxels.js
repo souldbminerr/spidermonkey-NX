@@ -616,6 +616,7 @@
   nx && nx.print && nx.print("dom-shim ready");
 }).call(this);
 
+
 // === sandboxels engine (extracted from index.html) ===
 try {
 		setTimeout(function() {
@@ -21351,13 +21352,29 @@ window.onload = function() {
   throw new Error(__m);
 }
 
+// === bootstrap.js ===
+// ============================================================================
+// Sandboxels on Switch -- bootstrap / main loop
+// ----------------------------------------------------------------------------
+// Runs after dom-shim.js and the extracted engine, in the same eval scope, so
+// it can call engine functions (tick, drawPixels, drawCursor, resizeCanvas,
+// selectElement, setView, clearAll) and read engine globals (settings, width,
+// height, pixelSize, mousePos, mouseType, mouseIsDown, canvasLayers, elements,
+// view, viewInfo, mouseSize).
+//
+// It finishes engine init, switches the harness into framebuffer mode, then
+// owns the frame loop: read Switch input -> drive engine globals -> step the
+// simulation timer -> render pixelMap + cursor + HUD (+ element picker) to the
+// framebuffer using nx.gfx (incl. nx.gfx.text bitmap font).
+// ============================================================================
+
 (function bootstrap() {
   const G = (typeof globalThis !== "undefined") ? globalThis : this;
   const log = (m) => { try { nx.print("[boot] " + m); } catch (e) {} };
 
-  const PIXEL_SIZE = 16;
+  const PIXEL_SIZE = 16;   // screen px per cell. 8 -> 160x90 grid (perf-friendly).
   const SCREEN_W = 1280, SCREEN_H = 720;
-  const TARGET_FRAME_MS = 33;
+  const TARGET_FRAME_MS = 16;     // ~30 fps cap
 
   const text = (s, x, y, col, a, scale) => {
     const c = G.__sbxParseColor(col || "#ffffff");
@@ -21382,8 +21399,9 @@ window.onload = function() {
   log("gfx " + fb.width + "x" + fb.height);
 
   try {
+    // --- 2. finish engine initialization (browser would fire window.onload) -
     if (typeof settings === "object" && settings) {
-      settings.textures = 0;
+      settings.textures = 0;           // force vector rendering (no image loads)
       if (!settings.bg) settings.bg = "#000000";
     }
     if (typeof G.onload === "function") {
@@ -21419,8 +21437,7 @@ window.onload = function() {
         const cat = el.category || "other";
         (map[cat] || (map[cat] = [])).push(name);
       }
-
-	  const pref = ["solids", "liquids", "gases", "powders", "life", "energy",
+      const pref = ["solids", "liquids", "gases", "powders", "life", "energy",
         "tools", "food", "special", "land", "weapons", "states", "machines"];
       const order = Object.keys(map).sort((a, b) => {
         const ia = pref.indexOf(a), ib = pref.indexOf(b);
@@ -21439,10 +21456,11 @@ window.onload = function() {
       try { (typeof selectElement === "function" ? selectElement : (e) => { currentElement = e; })(name); }
       catch (e) { currentElement = name; }
     }
-
-	setElement(elements["sand"] ? "sand" : (curList()[0] || "unknown"));
+    // pick a sane starting element
+    setElement(elements["sand"] ? "sand" : (curList()[0] || "unknown"));
     if (typeof mouseSize === "undefined") G.mouseSize = 5;
 
+    // --- 5. picker layout ----------------------------------------------------
     const TAB_W = 160, TAB_H = 40, TABS_PER_ROW = Math.floor(SCREEN_W / TAB_W);
     const tabRows = Math.ceil(cat.order.length / TABS_PER_ROW);
     const GRID_TOP = tabRows * TAB_H + 6;
@@ -21452,6 +21470,7 @@ window.onload = function() {
     const PER_PAGE = COLS * VIS_ROWS;
 
     function pickerHitTest(tx, ty) {
+      // returns {type:'tab', i} | {type:'cell', name} | null
       if (ty < tabRows * TAB_H) {
         const col = Math.floor(tx / TAB_W), row = Math.floor(ty / TAB_H);
         const i = row * TABS_PER_ROW + col;
@@ -21470,6 +21489,7 @@ window.onload = function() {
 
     function drawPicker() {
       rect(0, 0, SCREEN_W, SCREEN_H, "#101018", 235);
+      // category tabs
       for (let i = 0; i < cat.order.length; i++) {
         const col = i % TABS_PER_ROW, row = Math.floor(i / TABS_PER_ROW);
         const x = col * TAB_W, y = row * TAB_H;
@@ -21477,6 +21497,7 @@ window.onload = function() {
         rect(x + 1, y + 1, TAB_W - 2, TAB_H - 2, on ? "#3a64c0" : "#262630", 255);
         text(title(cat.order[i]).slice(0, 18), x + 8, y + 12, on ? "#ffffff" : "#b0b0c0", 255, 2);
       }
+      // element cells
       const list = curList();
       const start = page * PER_PAGE;
       for (let n = 0; n < PER_PAGE; n++) {
@@ -21498,6 +21519,7 @@ window.onload = function() {
         "   (tap to pick, dpad L/R page, L close)", 8, SCREEN_H - 22, "#9090a0", 255, 2);
     }
 
+    // --- 6. input ------------------------------------------------------------
     const B = {
       A: nx.A, B: nx.B, X: nx.X, Y: nx.Y, L: nx.L, R: nx.R, ZL: nx.ZL, ZR: nx.ZR,
       Plus: nx.Plus, Minus: nx.Minus, Up: nx.Up, Down: nx.Down, Left: nx.Left, Right: nx.Right,
@@ -21535,7 +21557,7 @@ window.onload = function() {
       }
 
       if (hit & B.L) { pickerOpen = true; return true; }
-      if (hit & B.R) {
+      if (hit & B.R) { // quick-cycle within current category
         const list = curList();
         let i = list.indexOf(currentElement);
         setElement(list[(i + 1 + list.length) % list.length] || list[0]);
@@ -21553,7 +21575,7 @@ window.onload = function() {
         gx = Math.max(0, Math.min(width, Math.floor(t.x / pixelSize)));
         gy = Math.max(0, Math.min(height, Math.floor(t.y / pixelSize)));
         cursor.x = gx; cursor.y = gy;
-        erasing = !!(held & B.B); // hold B while touching to erase
+        erasing = !!(held & B.B);     // hold B while touching to erase
         placing = !erasing;
       } else {
         if (hit & B.Up) cursor.y = Math.max(0, cursor.y - 1);
@@ -21599,10 +21621,42 @@ window.onload = function() {
       rect(cx - half + sz, cy - half, 1, sz, "#ffffff", 200);
     }
 
+    const canBatch = typeof nx.gfx.drawGrid === "function";
+    let gridBuf = null, gridW = 0, gridH = 0;
+    const u32cache = Object.create(null);
+    function colU32(s) {
+      if (typeof s !== "string") return 0;
+      let v = u32cache[s];
+      if (v !== undefined) return v;
+      const c = G.__sbxParseColor(s);
+      v = (((c[3] & 255) << 24) | ((c[2] & 255) << 16) | ((c[1] & 255) << 8) | (c[0] & 255)) >>> 0;
+      u32cache[s] = v;
+      return v;
+    }
+    function renderGrid() {
+      const W = (width | 0) + 1, H = (height | 0) + 1;
+      if (!gridBuf || gridW !== W || gridH !== H) { gridBuf = new Uint32Array(W * H); gridW = W; gridH = H; }
+      gridBuf.fill(0);
+      const cp = currentPixels;
+      if (cp) {
+        for (let i = 0; i < cp.length; i++) {
+          const p = cp[i];
+          if (!p || p.del) continue;
+          let q = p;
+          if (p.con && elements[p.element] && elements[p.element].canContain === true) q = p.con;
+          const x = q.x, y = q.y;
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          if (q.color) gridBuf[y * W + x] = colU32(q.color);
+        }
+      }
+      nx.gfx.drawGrid(gridBuf, W, H, pixelSize, 0, 0);
+    }
+
     function render() {
       const bg = G.__sbxBg;
       nx.gfx.clear(bg[0], bg[1], bg[2]);
-      try { if (typeof drawPixels === "function") drawPixels(true); } catch (e) { log("draw err: " + e + "\n" + (e && e.stack)); }
+      if (canBatch) { try { renderGrid(); } catch (e) { log("grid err: " + e + "\n" + (e && e.stack)); } }
+      else { try { if (typeof drawPixels === "function") drawPixels(true); } catch (e) { log("draw err: " + e + "\n" + (e && e.stack)); } }
       try { if (typeof drawCursor === "function") drawCursor(); } catch (e) {}
       if (pickerOpen) drawPicker();
       else drawHud();

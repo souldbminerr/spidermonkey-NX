@@ -47,7 +47,7 @@ CXXFLAGS	:= $(CFLAGS) -std=gnu++17 -fno-rtti -fno-exceptions \
 			-include $(SHIMS)/switch_pthread_compat.h
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-z,notext -Wl,-z,nopack-relative-relocs -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-z,notext -Wl,-z,nopack-relative-relocs -Wl,--wrap=pthread_create -Wl,-Map,$(notdir $*.map)
 
 # circular refs between libjs_static <-> libswitchextra(mozglue/mfbt) <-> libjsrust
 LIBS	:= -Wl,--start-group -ljs_static -ljsrust -lswitchextra -Wl,--end-group -lz -lnx

@@ -40,8 +40,6 @@
 #  define MMAP_FAULT_HANDLER_CATCH(retval) }
 
 #elif defined(MOZ_SWITCH_NO_SIGNAL)
-// Nintendo Switch / newlib: no POSIX signals (sigaction/sigsetjmp/siglongjmp
-// are unavailable on Horizon), so the mmap fault handler is a no-op.
 
 #  define MMAP_FAULT_HANDLER_BEGIN_HANDLE(fd) {
 #  define MMAP_FAULT_HANDLER_BEGIN_BUFFER(buf, bufLen) {

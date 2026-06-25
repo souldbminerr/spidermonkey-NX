@@ -235,6 +235,77 @@ bool gfx_blit(JSContext *cx, unsigned argc, JS::Value *vp) {
   return true;
 }
 
+bool gfx_drawGrid(JSContext *cx, unsigned argc, JS::Value *vp) {
+  JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+  if (!g_inited) {
+    args.rval().setUndefined();
+    return true;
+  }
+  if (args.length() < 4 || !args[0].isObject()) {
+    JS_ReportErrorASCII(cx, "gfx.drawGrid(u32, gw, gh, ps, [ox, oy])");
+    return false;
+  }
+  JS::RootedObject buf(cx, &args[0].toObject());
+  if (!JS_IsUint32Array(buf)) {
+    JS_ReportErrorASCII(cx, "gfx.drawGrid: arg0 must be a Uint32Array");
+    return false;
+  }
+  u32 gw, gh, ps;
+  int ox, oy;
+  if (!argU32(cx, args, 1, &gw) || !argU32(cx, args, 2, &gh) ||
+      !argU32(cx, args, 3, &ps) || !argI32(cx, args, 4, &ox) ||
+      !argI32(cx, args, 5, &oy))
+    return false;
+  if (ps < 1)
+    ps = 1;
+  size_t len = JS_GetTypedArrayLength(buf);
+  if ((size_t)gw * gh > len) {
+    JS_ReportErrorASCII(cx, "gfx.drawGrid: array smaller than gw*gh");
+    return false;
+  }
+  {
+    JS::AutoCheckCannotGC nogc;
+    bool shared;
+    const uint32_t *data = JS_GetUint32ArrayData(buf, &shared, nogc);
+    for (u32 cy = 0; cy < gh; cy++) {
+      int y0 = oy + (int)(cy * ps);
+      if (y0 >= (int)g_h)
+        break;
+      int y1 = y0 + (int)ps;
+      if (y1 <= 0)
+        continue;
+      if (y0 < 0)
+        y0 = 0;
+      if (y1 > (int)g_h)
+        y1 = g_h;
+      const uint32_t *crow = data + (size_t)cy * gw;
+      for (u32 cx2 = 0; cx2 < gw; cx2++) {
+        u32 c = crow[cx2];
+        if ((c >> 24) == 0)
+          continue;
+        u32 px = (c & 0x00ffffff) | 0xff000000;
+        int x0 = ox + (int)(cx2 * ps);
+        if (x0 >= (int)g_w)
+          continue;
+        int x1 = x0 + (int)ps;
+        if (x1 <= 0)
+          continue;
+        if (x0 < 0)
+          x0 = 0;
+        if (x1 > (int)g_w)
+          x1 = g_w;
+        for (int yy = y0; yy < y1; yy++) {
+          u32 *row = g_surface + (size_t)yy * g_w;
+          for (int xx = x0; xx < x1; xx++)
+            row[xx] = px;
+        }
+      }
+    }
+  }
+  args.rval().setUndefined();
+  return true;
+}
+
 static const unsigned char kFont8x8[96][8] = {
     {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, // ' '
     {0x18, 0x3C, 0x3C, 0x18, 0x18, 0x00, 0x18, 0x00}, // !
@@ -424,6 +495,7 @@ const JSFunctionSpec gfxFunctions[] = {
     JS_FN("init", gfx_init, 0, 0),       JS_FN("deinit", gfx_deinit, 0, 0),
     JS_FN("clear", gfx_clear, 3, 0),     JS_FN("fillRect", gfx_fillRect, 8, 0),
     JS_FN("blit", gfx_blit, 5, 0),       JS_FN("text", gfx_text, 3, 0),
+    JS_FN("drawGrid", gfx_drawGrid, 4, 0),
     JS_FN("present", gfx_present, 0, 0), JS_FS_END};
 
 } // namespace

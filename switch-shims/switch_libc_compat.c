@@ -37,10 +37,12 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
 
 long sysconf(int name) {
   switch (name) {
-  case 8:
+  case 8: /* _SC_PAGESIZE (newlib) */
     return 0x1000;
+  case 9:
+  case 10:
   case 0x4f:
-    return 1;
+    return 3;
   default:
     return -1;
   }

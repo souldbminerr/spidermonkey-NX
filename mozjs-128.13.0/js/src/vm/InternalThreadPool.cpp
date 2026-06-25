@@ -34,6 +34,8 @@ static const uint32_t kDefaultHelperStackSize = 2048 * 1024 - 2 * 4096;
 // require all the thread-specific state that TSan does.
 #if defined(MOZ_TSAN)
 static const uint32_t HELPER_STACK_SIZE = 2 * kDefaultHelperStackSize;
+#elif defined(MOZ_SWITCH)
+static const uint32_t HELPER_STACK_SIZE = 16 * 1024 * 1024;
 #else
 static const uint32_t HELPER_STACK_SIZE = kDefaultHelperStackSize;
 #endif
