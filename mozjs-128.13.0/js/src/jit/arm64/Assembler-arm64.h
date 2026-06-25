@@ -517,8 +517,13 @@ class Assembler : public vixl::Assembler {
       Instruction* inst = (Instruction*)(rawCode + patchAtOffset);
       Assembler::UpdateLoad64Value(inst, (uint64_t)(rawCode + targetOffset));
     } else {
+#ifdef MOZ_SWITCH
+      *reinterpret_cast<const void**>(
+          switchJitWritable(rawCode + patchAtOffset)) = rawCode + targetOffset;
+#else
       *reinterpret_cast<const void**>(rawCode + patchAtOffset) =
           rawCode + targetOffset;
+#endif
     }
   }
 

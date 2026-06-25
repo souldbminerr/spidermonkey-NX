@@ -176,7 +176,12 @@ BufferOffset Assembler::emitExtendedJumpTable() {
 
 void Assembler::executableCopy(uint8_t* buffer) {
   // Copy the code and all constant pools into the output buffer.
+#ifdef MOZ_SWITCH
+  armbuffer_.executableCopy(
+      reinterpret_cast<uint8_t*>(switchJitWritable(buffer)));
+#else
   armbuffer_.executableCopy(buffer);
+#endif
 
   // Patch any relative jumps that target code outside the buffer.
   // The extended jump table may be used for distant jumps.
@@ -194,7 +199,12 @@ void Assembler::executableCopy(uint8_t* buffer) {
       } else {
         JumpTableEntry* entry = &extendedJumpTable[i];
         branch->SetImmPCOffsetTarget(entry->getLdr());
+#ifdef MOZ_SWITCH
+        reinterpret_cast<JumpTableEntry*>(switchJitWritable(entry))->data =
+            target;
+#else
         entry->data = target;
+#endif
       }
     } else {
       // Currently a two-instruction call, it should be possible to optimize
@@ -334,7 +344,11 @@ void Assembler::PatchDataWithValueCheck(CodeLocationLabel label,
   Instruction* i = (Instruction*)label.raw();
   void** pValue = i->LiteralAddress<void**>();
   MOZ_ASSERT(*pValue == expected.value);
+#ifdef MOZ_SWITCH
+  *reinterpret_cast<void**>(switchJitWritable(pValue)) = newValue.value;
+#else
   *pValue = newValue.value;
+#endif
 }
 
 void Assembler::PatchDataWithValueCheck(CodeLocationLabel label,
@@ -433,7 +447,11 @@ void Assembler::ToggleCall(CodeLocationLabel inst_, bool enabled) {
 void Assembler::UpdateLoad64Value(Instruction* inst0, uint64_t value) {
   MOZ_ASSERT(inst0->IsLDR());
   uint64_t* literal = inst0->LiteralAddress<uint64_t*>();
+#ifdef MOZ_SWITCH
+  *reinterpret_cast<uint64_t*>(switchJitWritable(literal)) = value;
+#else
   *literal = value;
+#endif
 }
 
 class RelocationIterator {
@@ -554,7 +572,12 @@ void Assembler::TraceDataRelocations(JSTracer* trc, JitCode* code,
         if (awjc.isNothing()) {
           awjc.emplace(code);
         }
+#ifdef MOZ_SWITCH
+        *reinterpret_cast<uintptr_t*>(switchJitWritable(literalAddr)) =
+            v.asRawBits();
+#else
         *literalAddr = v.asRawBits();
+#endif
       }
       continue;
     }
@@ -568,7 +591,12 @@ void Assembler::TraceDataRelocations(JSTracer* trc, JitCode* code,
       if (awjc.isNothing()) {
         awjc.emplace(code);
       }
+#ifdef MOZ_SWITCH
+      *reinterpret_cast<uintptr_t*>(switchJitWritable(literalAddr)) =
+          uintptr_t(cell);
+#else
       *literalAddr = uintptr_t(cell);
+#endif
     }
   }
 }

@@ -31,6 +31,10 @@
 #include "jit/arm64/vixl/Globals-vixl.h"
 #include "jit/arm64/vixl/Utils-vixl.h"
 
+#ifdef MOZ_SWITCH
+#  include "switch_jitmem.h"  // switchJitWritable() - dual-mapping write redirect
+#endif
+
 namespace vixl {
 // ISA constants. --------------------------------------------------------------
 
@@ -160,7 +164,11 @@ class Instruction {
   }
 
   void SetInstructionBits(Instr new_instr) {
+#ifdef MOZ_SWITCH
+    *(reinterpret_cast<Instr*>(switchJitWritable(this))) = new_instr;
+#else
     *(reinterpret_cast<Instr*>(this)) = new_instr;
+#endif
   }
 
   int Bit(int pos) const {

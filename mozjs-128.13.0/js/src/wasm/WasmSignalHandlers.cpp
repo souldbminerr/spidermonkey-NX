@@ -43,7 +43,7 @@ using namespace js::wasm;
 
 using mozilla::DebugOnly;
 
-#if !defined(JS_CODEGEN_NONE)
+#if !defined(JS_CODEGEN_NONE) && !defined(MOZ_SWITCH_NO_SIGNAL)
 
 // =============================================================================
 // This following pile of macros and includes defines the ToRegisterState() and
@@ -813,8 +813,7 @@ static ExclusiveData<InstallState> sEagerInstallState(
 #endif  // !(JS_CODEGEN_NONE)
 
 void wasm::EnsureEagerProcessSignalHandlers() {
-#ifdef JS_CODEGEN_NONE
-  // If there is no JIT, then there should be no Wasm signal handlers.
+#if defined(JS_CODEGEN_NONE) || defined(MOZ_SWITCH_NO_SIGNAL)
   return;
 #else
   auto eagerInstallState = sEagerInstallState.lock();
@@ -888,7 +887,7 @@ void wasm::EnsureEagerProcessSignalHandlers() {
 #endif
 }
 
-#ifndef JS_CODEGEN_NONE
+#if !defined(JS_CODEGEN_NONE) && !defined(MOZ_SWITCH_NO_SIGNAL)
 static ExclusiveData<InstallState> sLazyInstallState(
     mutexid::WasmSignalInstallState);
 
@@ -931,7 +930,7 @@ static bool EnsureLazyProcessSignalHandlers() {
 #endif  // JS_CODEGEN_NONE
 
 bool wasm::EnsureFullSignalHandlers(JSContext* cx) {
-#ifdef JS_CODEGEN_NONE
+#if defined(JS_CODEGEN_NONE) || defined(MOZ_SWITCH_NO_SIGNAL)
   return false;
 #else
   if (cx->wasm().triedToInstallSignalHandlers) {

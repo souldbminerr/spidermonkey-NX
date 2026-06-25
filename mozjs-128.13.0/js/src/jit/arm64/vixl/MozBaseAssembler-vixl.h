@@ -264,7 +264,11 @@ class MozBaseAssembler : public js::jit::AssemblerShared {
   // Emit the instruction at |at|.
   static void Emit(Instruction* at, Instr instruction) {
     static_assert(sizeof(instruction) == kInstructionSize);
+#ifdef MOZ_SWITCH
+    memcpy(switchJitWritable(at), &instruction, sizeof(instruction));
+#else
     memcpy(at, &instruction, sizeof(instruction));
+#endif
   }
 
   static void EmitBranch(Instruction* at, Instr instruction) {

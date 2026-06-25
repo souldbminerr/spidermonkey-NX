@@ -6,6 +6,10 @@
 
 #include "jit/Ion.h"
 
+#ifdef MOZ_SWITCH
+#  include "switch_jitmem.h"  // switchJitWritable() - dual-mapping write redirect
+#endif
+
 #include "mozilla/CheckedInt.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/IntegerPrintfMacros.h"
@@ -618,6 +622,21 @@ template JitCode* JitCode::New<NoGC>(JSContext* cx, uint8_t* code,
                                      ExecutablePool* pool, CodeKind kind);
 
 void JitCode::copyFrom(MacroAssembler& masm) {
+#ifdef MOZ_SWITCH
+  uint8_t* w = reinterpret_cast<uint8_t*>(switchJitWritable(raw()));
+  JitCodeHeader::FromExecutable(w)->init(this);
+
+  insnSize_ = masm.instructionsSize();
+  masm.executableCopy(raw());
+
+  jumpRelocTableBytes_ = masm.jumpRelocationTableBytes();
+  masm.copyJumpRelocationTable(w + jumpRelocTableOffset());
+
+  dataRelocTableBytes_ = masm.dataRelocationTableBytes();
+  masm.copyDataRelocationTable(w + dataRelocTableOffset());
+
+  masm.processCodeLabels(raw());
+#else
   // Store the JitCode pointer in the JitCodeHeader so we can recover the
   // gcthing from relocation tables.
   JitCodeHeader::FromExecutable(raw())->init(this);
@@ -632,6 +651,7 @@ void JitCode::copyFrom(MacroAssembler& masm) {
   masm.copyDataRelocationTable(raw() + dataRelocTableOffset());
 
   masm.processCodeLabels(raw());
+#endif
 }
 
 void JitCode::traceChildren(JSTracer* trc) {

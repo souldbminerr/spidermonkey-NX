@@ -42,6 +42,15 @@
 #  include <unistd.h>
 #endif
 
+#ifdef MOZ_SWITCH
+extern "C" {
+void* switchExecReserve(size_t bytes);
+int switchExecProtect(void* addr, size_t bytes, int executable);
+int switchExecDecommit(void* addr, size_t bytes);
+void switchExecRelease(void* addr, size_t bytes);
+}
+#endif
+
 #ifdef MOZ_VALGRIND
 #  include <valgrind/valgrind.h>
 #endif
@@ -469,6 +478,9 @@ static void* ComputeRandomAllocationAddress() {
 static void DecommitPages(void* addr, size_t bytes);
 
 static void* ReserveProcessExecutableMemory(size_t bytes) {
+#ifdef MOZ_SWITCH
+  return switchExecReserve(bytes);
+#else
   // On most Unix platforms our strategy is as follows:
   //
   // * Reserve:  mmap with PROT_NONE
@@ -528,11 +540,16 @@ static void* ReserveProcessExecutableMemory(size_t bytes) {
   DecommitPages(p, bytes);
 #  endif
   return p;
+#endif  // MOZ_SWITCH
 }
 
 static void DeallocateProcessExecutableMemory(void* addr, size_t bytes) {
+#ifdef MOZ_SWITCH
+  switchExecRelease(addr, bytes);
+#else
   mozilla::DebugOnly<int> result = munmap(addr, bytes);
   MOZ_ASSERT(!result || errno == ENOMEM);
+#endif
 }
 
 static unsigned ProtectionSettingToFlags(ProtectionSetting protection) {
@@ -567,6 +584,10 @@ static unsigned ProtectionSettingToFlags(ProtectionSetting protection) {
 
 [[nodiscard]] static bool CommitPages(void* addr, size_t bytes,
                                       ProtectionSetting protection) {
+#ifdef MOZ_SWITCH
+  return switchExecProtect(addr, bytes,
+                           protection == ProtectionSetting::Executable) == 0;
+#else
   // See the comment in ReserveProcessExecutableMemory.
 #  if defined(XP_DARWIN)
   int ret;
@@ -594,9 +615,14 @@ static unsigned ProtectionSettingToFlags(ProtectionSetting protection) {
   MOZ_RELEASE_ASSERT(p == addr);
   return true;
 #  endif
+#endif  // MOZ_SWITCH
 }
 
 static void DecommitPages(void* addr, size_t bytes) {
+#ifdef MOZ_SWITCH
+  switchExecDecommit(addr, bytes);
+  return;
+#else
   // See the comment in ReserveProcessExecutableMemory.
 #  if defined(XP_DARWIN)
   int ret;
@@ -616,6 +642,7 @@ static void DecommitPages(void* addr, size_t bytes) {
                                    "js-executable-memory");
   MOZ_RELEASE_ASSERT(addr == p);
 #  endif
+#endif  // MOZ_SWITCH
 }
 #endif
 
@@ -977,6 +1004,11 @@ bool js::jit::ReprotectRegion(void* start, size_t size,
   // This is a essentially a VirtualProtect, but with lighter impact on
   // antivirus analysis. See bug 1823634.
   if (!VirtualAlloc(pageStart, size, MEM_COMMIT, flags)) {
+    return false;
+  }
+#  elif defined(MOZ_SWITCH)
+  if (switchExecProtect(pageStart, size,
+                        protection == ProtectionSetting::Executable) != 0) {
     return false;
   }
 #  else

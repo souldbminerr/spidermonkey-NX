@@ -4,7 +4,11 @@ ac_add_options --disable-jemalloc
 ac_add_options --without-intl-api
 ac_add_options --disable-js-shell
 ac_add_options --disable-tests
-ac_add_options --disable-jit
+# JIT via DUAL MAPPING (Horizon forbids single-address W^X; code-page perms are
+# one-shot from CodeStatic). switch_jitmem.c maps a permanent RW alias (src) and a
+# permanent RX alias (dst) of the same physical pages; SM writes through src and
+# executes through dst at a fixed offset. See ProcessExecutableMemory.cpp.
+ac_add_options --enable-jit
 ac_add_options --enable-optimize
 ac_add_options --disable-debug
 

@@ -12,10 +12,12 @@ $BIN/aarch64-none-elf-gcc $SW_ARCH -D__linux__ -D_GNU_SOURCE -I"$SHIMS" \
     -c "$SHIMS/switch_libc_compat.c" -o /tmp/libc_compat.o
 $BIN/aarch64-none-elf-gcc $SW_ARCH -D__SWITCH__ -I"$LIBNX/include" -I"$PORTLIBS/include" \
     -c "$SHIMS/switch_virtmem.c" -o /tmp/switch_virtmem.o
+$BIN/aarch64-none-elf-gcc $SW_ARCH -D__SWITCH__ -I"$LIBNX/include" -I"$PORTLIBS/include" \
+    -c "$SHIMS/switch_jitmem.c" -o /tmp/switch_jitmem.o
 OBJS=$(find "$MOZ"/obj-switch/mfbt "$MOZ"/obj-switch/mozglue "$MOZ"/obj-switch/memory -name '*.o' \
        -not -name 'Unified_cpp_mozglue_interposers0.o')
 rm -f "$JSLIBS/lib/libswitchextra.a"
-$BIN/aarch64-none-elf-ar rcs "$JSLIBS/lib/libswitchextra.a" $OBJS /tmp/switch_virtmem.o /tmp/libc_compat.o
+$BIN/aarch64-none-elf-ar rcs "$JSLIBS/lib/libswitchextra.a" $OBJS /tmp/switch_virtmem.o /tmp/switch_jitmem.o /tmp/libc_compat.o
 echo "  libswitchextra.a: $(ls -lh "$JSLIBS/lib/libswitchextra.a" | awk '{print $5}')"
 
 echo "=== copy prebuilt libs (real files so msys2/devkitA64 can read them) ==="

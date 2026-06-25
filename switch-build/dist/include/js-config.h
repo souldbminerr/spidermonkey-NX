@@ -68,7 +68,7 @@
 /* #undef ENABLE_WASM_EXCEPTIONS */
 /* #undef ENABLE_WASM_FUNCTION_REFERENCES */
 #define ENABLE_WASM_GC 1
-/* #undef ENABLE_WASM_SIMD */
+#define ENABLE_WASM_SIMD 1
 
 /* MOZILLA JSAPI version number components */
 #define MOZJS_MAJOR_VERSION 128
