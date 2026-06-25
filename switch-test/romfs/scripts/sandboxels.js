@@ -21569,7 +21569,7 @@ window.onload = function() {
     let cursor = { x: Math.round(cursorFx), y: Math.round(cursorFy) };
     let wasDrawing = false, lastDrawPos = { x: 0, y: 0 };
     const viewCount = (typeof viewInfo === "object") ? Object.keys(viewInfo).length : 1;
-    const CURSOR_SPEED = 2.2;   // grid cells/frame at full deflection
+    const CURSOR_SPEED = 1.1;   // grid cells/frame at full deflection
     const DEADZONE = 0.2;
     const REPEAT_DELAY = 9, REPEAT_RATE = 3;   // frames: hold-to-repeat for picker
     const repeatState = {};
